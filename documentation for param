@@ -1,0 +1,134 @@
+# Denoise Configuration File
+
+## Purpose
+
+The denoise configuration file controls which render passes are denoised in the compositor.
+
+For each pass listed in this file, the script will:
+
+- Enable Cycles denoising data (Denoising Normal and Denoising Albedo).
+- Insert a Denoise node for that pass.
+- Connect:
+  - The linked render pass → `Denoise.Image`
+  - `Denoising Normal` → `Denoise.Normal` (if available)
+  - `Denoising Albedo` → `Denoise.Albedo` (if available)
+- Reconnect the Denoise node output back into the corresponding File Output input.
+- Leave all other passes unchanged.
+
+## File Location
+
+Set the file path at the top of the script:
+
+```python
+denoise_node_file = "C:/path/to/denoise_rules.txt"
+```
+
+The path must point to a valid `.txt` file.
+
+## File Format
+
+The format is intentionally simple:
+
+- One pass name per line.
+- No symbols (no `=`, no commas, no quotes).
+- Case-sensitive.
+- Empty lines are ignored.
+- Lines starting with `#` are treated as comments and ignored.
+
+### Valid line examples
+
+DiffuseColor  
+GlossyDirect  
+TransmissionIndirect  
+
+### Invalid line examples
+
+DiffuseColor = Denoised  
+GlossyDirect, GlossyIndirect  
+"DiffuseColor"  
+Denoise(DiffuseColor)  
+
+## Valid Pass Names
+
+Pass names must match the File Output slot path names that your script uses and that `auto_link_in_out` connected.
+
+Common examples:
+
+DiffuseColor  
+DiffuseDirect  
+DiffuseIndirect  
+
+GlossyColor  
+GlossyDirect  
+GlossyIndirect  
+
+TransmissionColor  
+TransmissionDirect  
+TransmissionIndirect  
+
+SubsurfaceDirect  
+SubsurfaceIndirect  
+
+DenoisingData  
+
+If a name in the file does not match any connected pass, it will be skipped with a warning.
+
+## Example Configuration File
+
+```
+# Diffuse passes
+DiffuseColor
+DiffuseDirect
+DiffuseIndirect
+
+# Glossy passes
+GlossyColor
+GlossyDirect
+GlossyIndirect
+
+# Transmission passes
+TransmissionColor
+TransmissionDirect
+TransmissionIndirect
+
+# Subsurface passes
+SubsurfaceDirect
+SubsurfaceIndirect
+```
+
+## How the Script Uses This File
+
+1. The script reads `denoise_node_file` line by line.
+2. It ignores:
+   - Empty lines.
+   - Lines starting with `#`.
+3. For each remaining line (`RULE_NAME`):
+   - It looks for a matching connection in the `connections` list from `auto_link_in_out` (based on the File Output slot name).
+   - If found:
+     - It creates a `CompositorNodeDenoise` node.
+     - Connects the existing render output to the Denoise node’s `Image` input.
+     - Connects `Denoising Normal` and `Denoising Albedo` from the Render Layers node to the Denoise node, if those outputs exist.
+     - Disconnects the original link going into the File Output input.
+     - Connects `Denoise.Image` to that File Output input.
+   - If not found:
+     - It prints a warning and moves on.
+
+## Comments and Disabling Rules
+
+You can comment out specific passes by prefixing them with `#`:
+
+```
+# This is a comment
+DiffuseColor
+# GlossyIndirect   (temporarily disabled)
+GlossyDirect
+```
+
+Commented lines will not be processed.
+
+## Summary
+
+- One pass name per line.
+- Pass names must match the File Output slot names created and linked earlier by `auto_link_in_out`.
+- Comments start with `#`.
+- The script handles all denoise node creation and linking automatically based on this file.
